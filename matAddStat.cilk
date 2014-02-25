@@ -2,8 +2,24 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-cilk int main(int argc, char *argv[])
-{
+cilk void initializeMats(int size) {
+	/**/
+}
+
+cilk void matAddStatic(int workers, int splits, int size) {
+
+}
+
+cilk int main(int argc, char *argv[]) {
+	/* parse arguments */
+	/* example ./madd --nproc 2 5 500 
+	workers = 2
+	splits = 5
+	size = 500
+	*/
+	int workers, splits, size;
+	/* parse using atoi*/
+	matAddStatic(workers, splits, size);
 	printf("Hello World");
 	return 0;
 }
