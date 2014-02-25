@@ -1,0 +1,9 @@
+#include <cilk-lib.cilkh>
+#include <stdlib.h>
+#include <stdio.h>
+
+cilk int main(int argc, char *argv[])
+{
+	printf("Hello World");
+	return 0;
+}
