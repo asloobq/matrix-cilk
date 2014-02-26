@@ -3,7 +3,31 @@
 #include <stdio.h>
 
 
-void printMat(int **mat, int size) {
+cilk void matAdd(const int **A, const int **B, int **C, const int rows, const int cols) {
+	int i, j;
+	for(i = 0; i < rows; i++) {
+		for(j = 0; j < cols; j++) {
+			C[i][j] = A[i][j] + B[i][j];
+		}
+	}
+}  
+
+cilk void matSplitAdd(const int **A, const int **B, int **C, const int size,
+	const int splits) {
+	int i, offset;
+	/* check if we can split equally */
+	const int remainder = size % splits;
+	const int splitSize  = size / splits;
+	for( i = 0; i <= (splits-2); i++) {
+		offset = i*splitSize;
+		spawn matAdd(A + offset, B + offset, C + offset, splitSize, size); 
+	}
+	offset = i * splitSize;
+	spawn matAdd(A + offset, B + offset, C + offset, splitSize + remainder, size);
+	sync;
+}
+
+void printMat(const int **mat, const int size) {
 	int i, j;
 	printf("\n");
 	for(i = 0; i < size; i++) {
@@ -14,41 +38,37 @@ void printMat(int **mat, int size) {
 	}
 }
 
-cilk void initializeMat(int **mat, int size, int initval) {
+cilk void initializeMat(int **mat, const int size, const int initval) {
 	int i, j;
-	printf("initialize mat");
-	printf("Initialize mat size = %d", size);
-	if( size > 10 ) return;
+	printf("initialize mat\n");
+	printf("Initialize mat size = %d\n", size);
 	for(i = 0; i < size; i++) {
-		printf("initialize mat i = %d ", i);
+		printf("initialize mat i = %d \n", i);
 		for(j = 0; j < size; j++) {
-			printf("initialize mat j = %d : %d", j, size);
-			if(initval == -1) {
-				mat[i][j] = -1;
-//:				printf("m(i,j) = %d\n", mat[i][j]);
-			} else {
-				//printf("m(i,j) = %d\n", mat[i][j]);
-				mat[i][j] = rand_r(&size);
-//				printf("m(i,j) = %d\n", mat[i][j]);
-			}
+			printf("initialize mat j = %d : %d\n", j, size);
+			//if(initval == 0) {
+			//	mat[i][j] = rand_r(&size);
+			//} else {
+				mat[i][j] = initval;
+			//}
 		}
 	}
 } 
 
-cilk void initializeMats(int **A, int **B, int **C, int size) {
+cilk void initializeMats(int **A, int **B, int **C, const int size) {
 	/*
 	a. Load arrays A, B with positive random integers of any range 
 b. Load result array C with -1
 c. The loading of A, B, and C must be performed in parallel. 
 	*/
 	printf("size : %d\n", size);
-	 spawn initializeMat(A, size, 0);
-	 spawn initializeMat(B, size, 0);
+	 spawn initializeMat(A, size, 1);
+	 spawn initializeMat(B, size, 1);
 	 spawn initializeMat(C, size, -1);
 	sync;
 }
 
-cilk int** createMat(int **mat, int size) {
+cilk int** createMat(int **mat, const int size) {
 	int i, j;
 	if((mat = (int**) malloc(size * sizeof(int*))) == NULL) {
 		printf("Malloc error\n");
@@ -75,7 +95,7 @@ void matRelease(int **A, int **B, int **C) {
         free(C);
 }
 
-cilk void createMats(int **A, int **B, int **C, int size) {
+cilk void createMats(int **A, int **B, int **C, const int size, const int splits) {
 	/*
 	a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
 	b. Perform initializing concurrently i.e. parallel using Cilk constructs	
@@ -93,19 +113,30 @@ cilk void createMats(int **A, int **B, int **C, int size) {
 	
 	spawn initializeMats(A, B, C, size);
 	sync;	
-	printf("init finish\n");	
-//	printMat(A, size);
-//	printMat(B, size);
-//	printMat(C, size);
-//	matRelease(A, B, C);
+	printf("init finish\n");
+
+	
+	printf("Printing A\n");
+	printMat(A, size);
+	printf("Printing B\n");
+	printMat(B, size);
+	printf("Printing C\n");
+	printMat(C, size);
+	printf("Matrix Split Add \n");
+	
+	spawn matSplitAdd(A, B, C, size, splits);
+	printf("Printing C\n");
+	printMat(C, size);
+	printf("Releasing matrices \n");
+	matRelease(A, B, C);
 }
 
 
-cilk void matAddStatic(int workers, int splits, int size) {
+cilk void matAddStatic(const int workers, const int splits, const int size) {
 
 	int **A, **B, **C;
 	printf("matAddStatic\n");
-	spawn createMats(A, B, C, size);
+	spawn createMats(A, B, C, size, splits);
 	sync;
 }
 
