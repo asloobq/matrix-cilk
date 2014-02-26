@@ -2,12 +2,81 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-cilk void initializeMats(int size) {
-	/**/
+
+void printMat(int **mat, int size) {
+	int i, j;
+	printf("\n");
+	for(i = 0; i < size; i++) {
+		for(j =0; j < size; j++) {
+			printf("%d ", mat[i][j]);
+		}
+		printf("\n");
+	}
+}
+
+cilk void initializeMat(int **mat, unsigned int size, int initval) {
+	int i, j;
+	for(i = 0; i < size; i++) {
+		for(j = 0; j < size; j++) {
+			if(initval == -1) {
+				mat[i][j] = -1;
+			} else {
+				/* check if its thread safe*/
+				mat[i][j] = rand_r(&size);
+			}
+		}
+	}
+} 
+
+cilk void initializeMats(int **A, int **B, int **C, int size) {
+	/*
+	a. Load arrays A, B with positive random integers of any range 
+b. Load result array C with -1
+c. The loading of A, B, and C must be performed in parallel. 
+	*/
+	spawn initializeMat(A, size, 0);
+	spawn initializeMat(B, size, 0);
+	spawn initializeMat(C, size, -1);
+	sync;
+}
+
+cilk void createMat(int **mat, int size) {
+	int i;
+	 **mat = (int) malloc(size);
+        for(i = 0; i < size; i++) {
+                *mat[i] = (int)malloc(size);
+        }
+
+}
+
+cilk void createMats(int **A, int **B, int **C, int size) {
+	/*
+a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
+b. Perform initializing concurrently i.e. parallel using Cilk constructs	
+*/
+	//A
+	spawn createMat(A, size);
+	//B
+	spawn createMat(B, size);
+	//C
+	spawn createMat(C, size);
+	sync;	
+}
+
+cilk void matRelease(int **A, int **B, int **C) {
+	free(A);
+	free(B);
+	free(C);
 }
 
 cilk void matAddStatic(int workers, int splits, int size) {
 
+	int **A, **B, **C;
+	spawn createMats(A, B, C, size);
+	sync;
+	spawn initializeMats(A, B, C, size);
+	sync;
+	spawn matRelease(A, B, C);
 }
 
 cilk int main(int argc, char *argv[]) {
@@ -19,7 +88,16 @@ cilk int main(int argc, char *argv[]) {
 	*/
 	int workers, splits, size;
 	/* parse using atoi*/
-	matAddStatic(workers, splits, size);
-	printf("Hello World");
+	if(argc == 5) {
+		workers = atoi(argv[2]);
+		splits = atoi(argv[3]);
+		size = atoi(argv[4]);
+		spawn matAddStatic(workers, splits, size);
+		printf("Hello World workers = %d, splits = %d, size = %d", 
+			workers, splits, size);
+	} else {
+		printf("usage --nproc <workers> <splits> <size>");
+		return 0;
+	}
 	return 0;
 }
