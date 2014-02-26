@@ -14,19 +14,22 @@ void printMat(int **mat, int size) {
 	}
 }
 
-cilk void initializeMat(int **mat, unsigned int size, int initval) {
+cilk void initializeMat(int **mat, int size, int initval) {
 	int i, j;
+	printf("initialize mat");
+	printf("Initialize mat size = %d", size);
+	if( size > 10 ) return;
 	for(i = 0; i < size; i++) {
 		printf("initialize mat i = %d ", i);
 		for(j = 0; j < size; j++) {
-			printf("initialize mat j = %d ", j);
+			printf("initialize mat j = %d : %d", j, size);
 			if(initval == -1) {
 				mat[i][j] = -1;
-				printf("m(i,j) = %d\n", mat[i][j]);
+//:				printf("m(i,j) = %d\n", mat[i][j]);
 			} else {
 				//printf("m(i,j) = %d\n", mat[i][j]);
-				mat[i][j] = 0; //rand_r(&size);
-				printf("m(i,j) = %d\n", mat[i][j]);
+				mat[i][j] = rand_r(&size);
+//				printf("m(i,j) = %d\n", mat[i][j]);
 			}
 		}
 	}
@@ -38,6 +41,7 @@ cilk void initializeMats(int **A, int **B, int **C, int size) {
 b. Load result array C with -1
 c. The loading of A, B, and C must be performed in parallel. 
 	*/
+	printf("size : %d\n", size);
 	 spawn initializeMat(A, size, 0);
 	 spawn initializeMat(B, size, 0);
 	 spawn initializeMat(C, size, -1);
