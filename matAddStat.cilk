@@ -39,18 +39,20 @@ void printMat(const int **mat, const int size) {
 }
 
 cilk void initializeMat(int **mat, const int size, const int initval) {
-	int i, j;
+	int i, j, seed;
+	seed = size;
 	printf("initialize mat\n");
 	printf("Initialize mat size = %d\n", size);
 	for(i = 0; i < size; i++) {
 		printf("initialize mat i = %d \n", i);
 		for(j = 0; j < size; j++) {
 			printf("initialize mat j = %d : %d\n", j, size);
-			//if(initval == 0) {
-			//	mat[i][j] = rand_r(&size);
-			//} else {
+			if(initval == 0) {
+				mat[i][j] = rand_r(&seed);
+				seed = mat[i][j];
+			} else {
 				mat[i][j] = initval;
-			//}
+			}
 		}
 	}
 } 
@@ -62,8 +64,8 @@ b. Load result array C with -1
 c. The loading of A, B, and C must be performed in parallel. 
 	*/
 	printf("size : %d\n", size);
-	 spawn initializeMat(A, size, 1);
-	 spawn initializeMat(B, size, 1);
+	 spawn initializeMat(A, size, 0);
+	 spawn initializeMat(B, size, 0);
 	 spawn initializeMat(C, size, -1);
 	sync;
 }
@@ -87,6 +89,7 @@ cilk int** createMat(int **mat, const int size) {
 	if(mat == NULL) {
 		printf("malloc error \n");
 	}*/
+	return mat;
 }
 
 void matRelease(int **A, int **B, int **C) {
