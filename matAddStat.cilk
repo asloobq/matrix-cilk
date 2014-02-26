@@ -2,7 +2,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#if !defined(DEBUG) || DEBUG == 0
+#define LOG(...) do {} while(0);
 
+#elif DEBUG == 1
+#define LOG(format, ...) printf(format, ##__VA_ARGS__)
+#endif 
+
+#define DEBUG 0
+
+enum FillType {NEGATIVE_ONE, RANDOM};
+
+/*
+	Adds two matrices A and B and stores result in C.
+	Can have different no of rows and columns.
+*/
 cilk void matAdd(const int **A, const int **B, int **C, const int rows, const int cols) {
 	int i, j;
 	for(i = 0; i < rows; i++) {
@@ -12,6 +26,12 @@ cilk void matAdd(const int **A, const int **B, int **C, const int rows, const in
 	}
 }  
 
+/*
+	Splits two matrices A and B into 'splits' number of pieces
+	statically and adds them. Stores result in matrix C.
+	Handles case when 'size' is not a multiple of 'splits'.
+	Adds all pieces in parallel.
+*/
 cilk void matSplitAdd(const int **A, const int **B, int **C, const int size,
 	const int splits) {
 	int i, offset;
@@ -27,6 +47,9 @@ cilk void matSplitAdd(const int **A, const int **B, int **C, const int size,
 	sync;
 }
 
+/*
+	Prints a square matrix of size 'size'
+*/
 void printMat(const int **mat, const int size) {
 	int i, j;
 	printf("\n");
@@ -38,109 +61,124 @@ void printMat(const int **mat, const int size) {
 	}
 }
 
-cilk void initializeMat(int **mat, const int size, const int initval) {
+/*
+	Initializes a matrix with some initial values.
+	Initial value depends on enum type -
+	Random : fills with random numbers.
+	Negative_one : fills with -1
+*/
+cilk void initializeMat(int **mat, const int size, int fillType) {
 	int i, j, seed;
 	seed = size;
-	printf("initialize mat\n");
-	printf("Initialize mat size = %d\n", size);
+	LOG("initialize mat\n");
+	LOG("Initialize mat size = %d\n", size);
 	for(i = 0; i < size; i++) {
-		printf("initialize mat i = %d \n", i);
+		LOG("initialize mat i = %d \n", i);
 		for(j = 0; j < size; j++) {
-			printf("initialize mat j = %d : %d\n", j, size);
-			if(initval == 0) {
+			LOG("initialize mat j = %d : %d\n", j, size);
+			if(fillType == RANDOM) {
 				mat[i][j] = rand_r(&seed);
 				seed = mat[i][j];
 			} else {
-				mat[i][j] = initval;
+				mat[i][j] = -1;
 			}
 		}
 	}
 } 
 
+/*
+	Initialises all three matrices with some initial values.
+*/
 cilk void initializeMats(int **A, int **B, int **C, const int size) {
 	/*
 	a. Load arrays A, B with positive random integers of any range 
-b. Load result array C with -1
-c. The loading of A, B, and C must be performed in parallel. 
+	b. Load result array C with -1
+	c. The loading of A, B, and C must be performed in parallel. 
 	*/
-	printf("size : %d\n", size);
-	 spawn initializeMat(A, size, 0);
-	 spawn initializeMat(B, size, 0);
-	 spawn initializeMat(C, size, -1);
+	LOG("InitializeMats size : %d\n", size);
+	spawn initializeMat(A, size, RANDOM);
+	spawn initializeMat(B, size, RANDOM);
+	spawn initializeMat(C, size, NEGATIVE_ONE);
 	sync;
 }
 
+/*
+	Allocates memory for a square matrix based on its size.
+	@return pointer to the matrix.
+*/
 cilk int** createMat(int **mat, const int size) {
-	int i, j;
+	int i;
 	if((mat = (int**) malloc(size * sizeof(int*))) == NULL) {
 		printf("Malloc error\n");
 	}
-	printf("\n createMat \n");
+	LOG("\n createMat \n");
         for(i = 0; i < size; i++) {
                 if ((mat[i] = (int *)malloc(size * sizeof(int))) == NULL) {
 			printf(" malloc error\n");
 		}
-		printf("createmat %d \n", i);
-		mat[i][0] = 0;
-		printf("m = %d", mat[i][0]);
+		LOG("createmat %d \n", i);
         }
-	printf("creating mat\n");
-	/*mat = malloc(sizeof(sizeof(int) * size * size));
+	LOG("creating mat\n");
+	/*//Simpler way of malloc?
+	mat = malloc(sizeof(sizeof(int) * size * size));
 	if(mat == NULL) {
 		printf("malloc error \n");
 	}*/
 	return mat;
 }
 
+/*
+	Releases memory allocated by the three matrices.
+*/
 void matRelease(int **A, int **B, int **C) {
         free(A);
         free(B);
         free(C);
 }
 
-cilk void createMats(int **A, int **B, int **C, const int size, const int splits) {
+/*
+	Perform all steps in Matrix Addition without
+	Recursive Divide and Conquer.
+*/
+cilk void matAddStatic(const int workers, const int splits, const int size) {
+
+	int **A, **B, **C;
+	LOG("matAddStatic\n");
+	//spawn createMats(A, B, C, size, splits);
+	//sync;
 	/*
-	a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
-	b. Perform initializing concurrently i.e. parallel using Cilk constructs	
+		a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
+		b. Perform initializing concurrently i.e. parallel using Cilk constructs	
 	*/
 	//A
-	printf("creating mat A");
+	LOG("creating mat A");
 	A = spawn createMat(A, size);
 	//B
-	printf("creating mat B");
+	LOG("creating mat B");
 	B = spawn createMat(B, size);
 	//C
-	printf("creating mat C");
+	LOG("creating mat C");
 	C = spawn createMat(C, size);
 	sync;
 	
 	spawn initializeMats(A, B, C, size);
 	sync;	
-	printf("init finish\n");
+	LOG("init finish\n");
 
 	
-	printf("Printing A\n");
+	LOG("Printing A\n");
 	printMat(A, size);
-	printf("Printing B\n");
+	LOG("Printing B\n");
 	printMat(B, size);
-	printf("Printing C\n");
+	LOG("Printing C\n");
 	printMat(C, size);
-	printf("Matrix Split Add \n");
+	LOG("Matrix Split Add \n");
 	
 	spawn matSplitAdd(A, B, C, size, splits);
-	printf("Printing C\n");
+	LOG("Printing C\n");
 	printMat(C, size);
-	printf("Releasing matrices \n");
+	LOG("Releasing matrices \n");
 	matRelease(A, B, C);
-}
-
-
-cilk void matAddStatic(const int workers, const int splits, const int size) {
-
-	int **A, **B, **C;
-	printf("matAddStatic\n");
-	spawn createMats(A, B, C, size, splits);
-	sync;
 }
 
 cilk int main(int argc, char *argv[]) {
@@ -158,10 +196,10 @@ cilk int main(int argc, char *argv[]) {
 		size = atoi(argv[2]);
 		spawn matAddStatic(workers, splits, size);
 		sync;
-		printf("Hello World workers = %d, splits = %d, size = %d\n", 
+		LOG("Hello World workers = %d, splits = %d, size = %d\n", 
 			workers, splits, size);
 	} else {
-		printf("argc = %d\n", argc);
+		LOG("argc = %d\n", argc);
 		printf("usage --nproc <workers> <splits> <size>\n");
 		return 0;
 	}
