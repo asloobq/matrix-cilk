@@ -1,0 +1,240 @@
+#include <cilk-lib.cilkh>
+#include <stdlib.h>
+#include <stdio.h>
+
+#define DEBUG 0
+
+#if !defined(DEBUG) || DEBUG == 0
+#define LOG(...) do {} while(0);
+
+#elif DEBUG == 1
+#define LOG(format, ...) printf(format, ##__VA_ARGS__)
+#endif
+
+/*
+   TODO List
+   -format output according to word file
+   -remove warnings
+   -do writeup
+   -remove this todo list (duh!)
+ */
+
+enum FillType {NEGATIVE_ONE, RANDOM};
+
+
+/*
+   Checks if current 'splitSize' is less then or equal to base size.
+   If yes, then performs normal addition.
+   If no, then splits the matrix in half and calls recursively.
+ */
+cilk void matAddRecursive(const int **A, const int **B, int **C, const int size, const int base, const int currentSize) {
+	int i, j;
+	LOG("matAddRecursive currentSize = %d, base = %d\n", currentSize, base);
+	if(currentSize <= base) {
+		/* perform sequential addition */
+		for(i = 0; i < currentSize; i++) {
+			for(j = 0; j < size; j++) {
+				C[i][j] = A[i][j] + B[i][j];
+			}
+		}
+	} else {
+		/* Split into half and call recursively */
+		spawn matAddRecursive(A, B, C, size, base, currentSize / 2);
+		spawn matAddRecursive(A + (currentSize/2), B + (currentSize/2), C + (currentSize/2), size, base,
+				currentSize - (currentSize / 2));
+		sync;
+	}
+}
+
+/*
+   Calculates the 'base' size and starts matrix addition
+   with Divide and Conquer technique.
+ */
+cilk void matAddRecursiveBegin(const int **A, const int **B, int **C, const int size, const int splits) {
+	int baseSize;
+	baseSize = size / splits;
+	spawn matAddRecursive(A, B, C, size, baseSize, size);
+}
+
+/*
+   Prints a square matrix of size 'size'
+ */
+void printMat(const int **mat, const int size) {
+	int i, j;
+	printf("\n");
+	for(i = 0; i < size; i++) {
+		for(j =0; j < size; j++) {
+			printf("ary[%d][%d] = %d ", i, j, mat[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+/*
+   Initializes a matrix with some initial values.
+   Initial value depends on enum type -
+Random : fills with random numbers.
+Negative_one : fills with -1
+ */
+cilk void initializeMat(int **mat, const int size, int fillType) {
+	int i, j, seed;
+	//seed = size;
+	LOG("initialize mat\n");
+	LOG("Initialize mat size = %d\n", size);
+	for(i = 0; i < size; i++) {
+		LOG("initialize mat i = %d \n", i);
+		for(j = 0; j < size; j++) {
+			LOG("initialize mat j = %d : %d\n", j, size);
+			if(fillType == RANDOM) {
+				mat[i][j] = (rand_r(&seed)%100);
+				//mat[i][j] = 2;
+				seed = mat[i][j];
+			} else {
+				mat[i][j] = -1;
+			}
+		}
+	}
+}
+
+/*
+   Initialises all three matrices with some initial values.
+ */
+cilk void initializeMats(int **A, int **B, int **C, const int size) {
+	/*
+	   a. Load arrays A, B with positive random integers of any range
+	   b. Load result array C with -1
+	   c. The loading of A, B, and C must be performed in parallel.
+	 */
+	LOG("InitializeMats size : %d\n", size);
+	spawn initializeMat(A, size, RANDOM);
+	spawn initializeMat(B, size, RANDOM);
+	spawn initializeMat(C, size, NEGATIVE_ONE);
+	sync;
+}
+
+/*
+   Allocates memory for a square matrix based on its size.
+   @return pointer to the matrix.
+ */
+cilk int** createMat(int **mat, const int size) {
+	int i;
+	if((mat = (int**) malloc(size * sizeof(int*))) == NULL) {
+		printf("Malloc error\n");
+	}
+	LOG("\n createMat \n");
+	for(i = 0; i < size; i++) {
+		if ((mat[i] = (int *)malloc(size * sizeof(int))) == NULL) {
+			printf(" malloc error\n");
+		}
+		LOG("createmat %d \n", i);
+	}
+	LOG("creating mat\n");
+	/*//Simpler way of malloc?
+	  mat = malloc(sizeof(sizeof(int) * size * size));
+	  if(mat == NULL) {
+	  printf("malloc error \n");
+	  }*/
+	return mat;
+}
+
+/*
+   Releases memory allocated by the three matrices.
+ */
+void matRelease(int **A, int **B, int **C) {
+	free(A);
+	free(B);
+	free(C);
+}
+
+/*
+   Perform all steps in Matrix Addition without
+   Recursive Divide and Conquer.
+ */
+cilk void matAddStatic(const int workers, const int splits, const int size) {
+
+	int **A, **B, **C;
+	LOG("matAddStatic\n");
+	/*
+	   a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
+	   b. Perform initializing concurrently i.e. parallel using Cilk constructs
+	 */
+	//A
+	LOG("Create Matrix A \n");
+	A = spawn createMat(A, size);
+	//B
+	LOG("Create Matrix B \n");
+	B = spawn createMat(B, size);
+	//C
+	LOG("Create Matrix C \n");
+	C = spawn createMat(C, size);
+	sync;
+
+	spawn initializeMats(A, B, C, size);
+	sync;
+	LOG("init finish\n");
+
+
+	printf("Matrix A loaded with random numbers:\n");
+	printMat(A, size);
+	printf("Matrix B loaded with random numbers:\n");
+	printMat(B, size);
+	printf("Matrix C loaded with -1's:\n");
+	printMat(C, size);
+	LOG("Matrix Split Add \n");
+
+	// spawn matSplitAdd(A, B, C, size, splits);
+	 spawn matAddRecursiveBegin(A, B, C, size, splits);
+	// spawn matMultSimple(A, B, C, size, size);
+	// spawn matMultStaticSplit(A, B, C, size, splits);
+	// spawn matMultRecursiveBegin(A, B, C, size, splits);
+	sync;
+	printf("Matrix C holds result after A[]+B[]:\n");
+	printMat(C, size);
+	LOG("Releasing matrices \n");
+	matRelease(A, B, C);
+}
+
+cilk int main(int argc, char *argv[]) {
+	/* parse arguments */
+	/* example ./madd --nproc 2 5 500
+	   workers = 2
+	   splits = 5
+	   size = 500
+	 */
+	int workers, splits, size;
+	Cilk_time tm_begin, tm_elapsed;
+	Cilk_time wk_begin, wk_elapsed;
+	Cilk_time cp_begin, cp_elapsed;	
+
+	/* parse using atoi*/
+	if(argc == 3) {
+		workers = atoi(argv[0]);
+		splits = atoi(argv[1]);
+		size = atoi(argv[2]);
+
+		// Start Timing
+		cp_begin = Cilk_user_critical_path;
+		wk_begin = Cilk_user_work;
+		tm_begin = Cilk_get_wall_time();
+
+		spawn matAddStatic(workers, splits, size);
+		sync;
+
+		//Stop Timing
+		tm_elapsed = Cilk_get_wall_time() - tm_begin;
+		wk_elapsed = Cilk_user_work - wk_begin;
+		cp_elapsed = Cilk_user_critical_path - cp_begin;
+
+		printf("Running time = %4f s\n", Cilk_wall_time_to_sec(tm_elapsed));
+		printf("Work = %4f s\n", Cilk_time_to_sec(wk_elapsed));
+		printf("Span = %4f s\n\n", Cilk_time_to_sec(cp_elapsed));
+
+		LOG("Hello World workers = %d, splits = %d, size = %d\n",
+				workers, splits, size);
+	} else {
+		printf("usage --nproc <workers> <splits> <size>\n");
+		return 0;
+	}
+	return 0;
+}
