@@ -15,7 +15,8 @@
 enum FillType {NEGATIVE_ONE, RANDOM};
 
 /*
-	Part of matrix multiplication
+	Part of matrix multiplication. Perfroms multiplcation for 'n' rows in the result matrix,
+	where n = endRow - startRow
 */
 cilk void matMultPartRow(const int **A, const int **B, int **C, const int size, const int startRow, const int endRow) {
 	int i, j, k;
@@ -24,34 +25,42 @@ cilk void matMultPartRow(const int **A, const int **B, int **C, const int size, 
 			C[i][j] = 0;
 			for(k = 0; k < size; k++) {
 				C[i][j] += (A[i][k] * B[k][j]);
-				LOG("matMultPartRow i = %d , j = %d, k = %d\n", i, j, k);
 			}
 		}
 }
 
 /*
 	Matrix multiplication Splitter.
-	NOTE:: SegFault on calling this method
 */
-cilk void matMultStaticSplit(const int **A, const int **B, int **C, const int size, const int splits) {
+cilk void matMultStaticSplit(const int **A, const int **B, int **C, const int size, int splits) {
 	/*
 		Assuming both are square matrices of same size.
 	*/
 	int remainder, splitSize;
 	int i;
 	int startRow, endRow, startCol, endCol;
-	LOG("matMultStaticSplit\n");	
-	remainder  = (size % splits);
+	LOG("matMultStaticSplit\n");
+	/*
+		Size has to be Greater than number of splits.
+	*/
+	if( size < splits) {
+		/* set both same */
+		splits = size;
+	}	
+	remainder  = (size % splits);/* will be added to last spawn is non-zero*/
 	splitSize = size / splits;
 	startRow = 0;
 	endRow = startRow + splitSize - 1;
-	for(i = 0; i < splits; i++) {
+	for(i = 1; i <= (splits-1); i++) {
 		LOG("matMultStaticSplit startRow = %d, endRow = %d\n", startRow, endRow);
 		spawn matMultPartRow(A, B, C, size, startRow, endRow);
 
 		startRow += splitSize;
 		endRow = startRow + splitSize - 1;
 	}
+
+	/* Handle last iteration separately */
+	spawn matMultPartRow(A, B, C, size, startRow, endRow + remainder);
 	sync;
 }
 
@@ -94,7 +103,7 @@ cilk void matAddParallel(const int **A, const int **B, int **C, const int splitS
 
 /*
 	Splits two matrices A and B into 'splits' number of pieces
-	statically and adds them. Stores result in matrix C.
+	statically, and adds them. Stores result in matrix C.
 	Handles case when 'size' is not a multiple of 'splits'.
 	Adds all pieces in parallel.
 */
@@ -108,6 +117,7 @@ cilk void matSplitAdd(const int **A, const int **B, int **C, const int size,
 		offset = i*splitSize;
 		spawn matAdd(A + offset, B + offset, C + offset, splitSize, size); 
 	}
+	/* Handle last iteration separately to handle remaining rows */
 	offset = i * splitSize;
 	spawn matAdd(A + offset, B + offset, C + offset, splitSize + remainder, size);
 	sync;
