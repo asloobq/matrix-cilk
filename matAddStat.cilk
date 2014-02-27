@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define DEBUG 1 
+#define DEBUG 0 
 
 #if !defined(DEBUG) || DEBUG == 0
 #define LOG(...) do {} while(0);
@@ -13,17 +13,54 @@
 
 /*
 TODO List
--do recursive multiplication
--do recursive addition
 -add random function
 -add cilk timer
 -format output according to word file
+-remove warnings
 -split into 4 source code files.
 -do writeup
 -remove this todo list (duh!)
 */
 
 enum FillType {NEGATIVE_ONE, RANDOM};
+
+
+/*
+	Checks if the rowCount is less than or equal to base size.
+	If yes, then computes multiplication normally.
+	Else splits the rowCount into half and calls both halves recursively.
+*/
+cilk void matMultRecursive(const int **A, const int **B, int **C, const int totalSize, const int baseSize,
+	const int startRow, const int rowCount) {
+	int i, j, k, endRow;
+	if(rowCount <= baseSize) {
+	
+		endRow = startRow + rowCount - 1;
+		/* compute multiplication normally */
+		for(i = startRow ; i <= endRow ; i++)
+			for(j = 0; j < totalSize; j++) {
+				C[i][j] = 0;
+				for(k = 0; k < totalSize; k++) {
+					C[i][j] += (A[i][k] * B[k][j]);
+				}
+			}
+	} else {
+		/* split into halves */
+		spawn matMultRecursive(A, B, C, totalSize, baseSize, startRow, rowCount/2);
+		spawn matMultRecursive(A, B, C, totalSize, baseSize, startRow + (rowCount/2), rowCount - (rowCount/2));
+	}
+}
+
+/*
+	Starts multiplication in divide and conquer technique.
+	Calculates the 'base size' of the matrix based on number of splits.
+*/
+cilk void matMultRecursiveBegin(const int **A, const int **B, int **C, const int size, int splits) {
+	int baseSize;
+	baseSize = size / splits;
+	spawn matMultRecursive(A, B, C, size, baseSize, 0, size);
+}
+
 
 /*
 	Part of matrix multiplication. Perfroms multiplcation for 'n' rows in the result matrix,
@@ -41,7 +78,11 @@ cilk void matMultPartRow(const int **A, const int **B, int **C, const int size, 
 }
 
 /*
-	Matrix multiplication Splitter.
+	Matrix multiplication Static Splitter.
+	Splits the resultant matrix into 'splits' number of pieces in row order 
+	(i.e. 'x' number of rows in each split)
+	Calculates the 'starting row' and 'ending row' for each split
+	and spawns a new thread for each piece.
 */
 cilk void matMultStaticSplit(const int **A, const int **B, int **C, const int size, int splits) {
 	/*
@@ -49,7 +90,7 @@ cilk void matMultStaticSplit(const int **A, const int **B, int **C, const int si
 	*/
 	int remainder, splitSize;
 	int i;
-	int startRow, endRow, startCol, endCol;
+	int startRow, endRow;
 	LOG("matMultStaticSplit\n");
 	/*
 		Size has to be Greater than number of splits.
@@ -257,8 +298,6 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 
 	int **A, **B, **C;
 	LOG("matAddStatic\n");
-	//spawn createMats(A, B, C, size, splits);
-	//sync;
 	/*
 		a. Initialize all matrices i.e. allocate memory space for matrices A, B, C
 		b. Perform initializing concurrently i.e. parallel using Cilk constructs	
@@ -288,9 +327,10 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 	LOG("Matrix Split Add \n");
 	
 //	spawn matSplitAdd(A, B, C, size, splits);
-	spawn matAddRecursiveBegin(A, B, C, size, splits);
+//	spawn matAddRecursiveBegin(A, B, C, size, splits);
 //	spawn matMultSimple(A, B, C, size, size);
-//	spawn matMultStaticSplit(A, B, C, size, splits);
+	spawn matMultStaticSplit(A, B, C, size, splits);
+//	spawn matMultRecursiveBegin(A, B, C, size, splits);
 	sync;
 	LOG("Printing C\n");
 	printMat(C, size);
@@ -316,7 +356,6 @@ cilk int main(int argc, char *argv[]) {
 		LOG("Hello World workers = %d, splits = %d, size = %d\n", 
 			workers, splits, size);
 	} else {
-		LOG("argc = %d\n", argc);
 		printf("usage --nproc <workers> <splits> <size>\n");
 		return 0;
 	}
