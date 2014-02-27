@@ -208,10 +208,11 @@ void printMat(const int **mat, const int size) {
 	printf("\n");
 	for(i = 0; i < size; i++) {
 		for(j =0; j < size; j++) {
-			printf("%d ", mat[i][j]);
+			printf("ary[%d][%d] = %d ", i, j, mat[i][j]);
 		}
 		printf("\n");
 	}
+	printf("\n");
 }
 
 /*
@@ -303,13 +304,13 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 		b. Perform initializing concurrently i.e. parallel using Cilk constructs	
 	*/
 	//A
-	LOG("creating mat A");
+	LOG("Create Matrix A \n");
 	A = spawn createMat(A, size);
 	//B
-	LOG("creating mat B");
+	LOG("Create Matrix B \n");
 	B = spawn createMat(B, size);
 	//C
-	LOG("creating mat C");
+	LOG("Create Matrix C \n");
 	C = spawn createMat(C, size);
 	sync;
 	
@@ -318,11 +319,11 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 	LOG("init finish\n");
 
 	
-	LOG("Printing A\n");
+	printf("Matrix A loaded with random numbers:\n");
 	printMat(A, size);
-	LOG("Printing B\n");
+	printf("Matrix B loaded with random numbers:\n");
 	printMat(B, size);
-	LOG("Printing C\n");
+	printf("Matrix C loaded with -1's:\n");
 	printMat(C, size);
 	LOG("Matrix Split Add \n");
 	
@@ -332,7 +333,7 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 	spawn matMultStaticSplit(A, B, C, size, splits);
 //	spawn matMultRecursiveBegin(A, B, C, size, splits);
 	sync;
-	LOG("Printing C\n");
+	printf("Matrix C holds result after A[]+B[]:\n");
 	printMat(C, size);
 	LOG("Releasing matrices \n");
 	matRelease(A, B, C);
