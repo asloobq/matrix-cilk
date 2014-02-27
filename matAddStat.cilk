@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define DEBUG 0 
+#define DEBUG 1 
 
 #if !defined(DEBUG) || DEBUG == 0
 #define LOG(...) do {} while(0);
@@ -11,6 +11,17 @@
 #define LOG(format, ...) printf(format, ##__VA_ARGS__)
 #endif 
 
+/*
+TODO List
+-do recursive multiplication
+-do recursive addition
+-add random function
+-add cilk timer
+-format output according to word file
+-split into 4 source code files.
+-do writeup
+-remove this todo list (duh!)
+*/
 
 enum FillType {NEGATIVE_ONE, RANDOM};
 
@@ -97,8 +108,33 @@ cilk void matAdd(const int **A, const int **B, int **C, const int rows, const in
 	If yes, then performs normal addition.
 	If no, then splits the matrix in half and calls recursively.
 */
-cilk void matAddParallel(const int **A, const int **B, int **C, const int splitSize, const int base) {
+cilk void matAddRecursive(const int **A, const int **B, int **C, const int size, const int base, const int currentSize) {
+	int i, j;
+	LOG("matAddRecursive currentSize = %d, base = %d\n", currentSize, base);
+	if(currentSize <= base) {
+		/* perform sequential addition */
+		for(i = 0; i < currentSize; i++) {
+			for(j = 0; j < size; j++) {
+				C[i][j] = A[i][j] + B[i][j];
+			}
+	}	
+	} else {
+		/* Split into half and call recursively */
+		spawn matAddRecursive(A, B, C, size, base, currentSize / 2);
+		spawn matAddRecursive(A + (currentSize/2), B + (currentSize/2), C + (currentSize/2), size, base, 
+			currentSize - (currentSize / 2));
+		sync;
+	}
+}
 
+/*
+	Calculates the 'base' size and starts matrix addition 
+	with Divide and Conquer technique.
+*/
+cilk void matAddRecursiveBegin(const int **A, const int **B, int **C, const int size, const int splits) {
+	int baseSize;
+	baseSize = size / splits;
+	spawn matAddRecursive(A, B, C, size, baseSize, size); 
 }
 
 /*
@@ -252,8 +288,9 @@ cilk void matAddStatic(const int workers, const int splits, const int size) {
 	LOG("Matrix Split Add \n");
 	
 //	spawn matSplitAdd(A, B, C, size, splits);
+	spawn matAddRecursiveBegin(A, B, C, size, splits);
 //	spawn matMultSimple(A, B, C, size, size);
-	spawn matMultStaticSplit(A, B, C, size, splits);
+//	spawn matMultStaticSplit(A, B, C, size, splits);
 	sync;
 	LOG("Printing C\n");
 	printMat(C, size);
