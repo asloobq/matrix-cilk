@@ -108,7 +108,7 @@ cilk void initializeMat(int **mat, const int size, int fillType) {
 		for(j = 0; j < size; j++) {
 			LOG("initialize mat j = %d : %d\n", j, size);
 			if(fillType == RANDOM) {
-				mat[i][j] = (rand_r(&seed)%100);
+				mat[i][j] = (rand_r(&seed)%10000);
 				//mat[i][j] = 2;
 				seed = mat[i][j];
 			} else {

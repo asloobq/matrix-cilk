@@ -74,8 +74,8 @@ void printMat(const int **mat, const int size) {
 /*
    Initializes a matrix with some initial values.
    Initial value depends on enum type -
-Random : fills with random numbers.
-Negative_one : fills with -1
+   Random : fills with random numbers.
+   Negative_one : fills with -1
  */
 cilk void initializeMat(int **mat, const int size, int fillType) {
 	int i, j, seed;
@@ -87,7 +87,7 @@ cilk void initializeMat(int **mat, const int size, int fillType) {
 		for(j = 0; j < size; j++) {
 			LOG("initialize mat j = %d : %d\n", j, size);
 			if(fillType == RANDOM) {
-				mat[i][j] = (rand_r(&seed)%100);
+				mat[i][j] = (rand_r(&seed)%10000);
 				//mat[i][j] = 2;
 				seed = mat[i][j];
 			} else {
